@@ -102,7 +102,7 @@ module rv_pl(
     );
 
     assign i_addr = F_pc;
-    assign D_instr = i_instr;
+    // assign D_instr = i_instr;
 
     // ============================================
     // PIPE: F -> D
@@ -115,10 +115,10 @@ module rv_pl(
         .flush   (D_flush), 
         .F_pc    (F_pc),
         .F_pc4   (F_pc_p4),
-        .F_instr (32'b0),
+        .F_instr (i_instr),
         .D_pc    (D_pc),
         .D_pc4   (D_pc_p4),
-        .D_instr ()
+        .D_instr (D_instr)
     );
 
     // ============================================
@@ -271,11 +271,11 @@ module rv_pl(
 
     assign d_addr = M_alu_o;
     assign d_wdata = M_dm_wd;
-    // write the bit en signal for annoying vivado which does not let us disable byte w enable...
+    // write the bit en signal for annoying vivado 
     assign d_we = {4{M_we_dm}};
 
     assign M_dm_rd = d_rdata;
-    assign W_dm_rd = d_rdata;
+    // W_dm_rd comes from MW pipeline register, NOT directly from BRAM
     // ============================================
     // PIPE: M -> W
     // ============================================
@@ -292,7 +292,7 @@ module rv_pl(
         .M_sel_result   (M_sel_result),
         .M_we_rf        (M_we_rf),
 
-        .W_dm_rd        (),
+        .W_dm_rd        (W_dm_rd),  
         .W_alu_o        (W_alu_o),
         .W_rf_a3        (W_rf_a3),
         .W_pc_p4        (W_pc_p4),
