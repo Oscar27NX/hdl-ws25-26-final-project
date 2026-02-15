@@ -28,23 +28,32 @@ module HazardUnit (
     output reg       FlushD
 );
 
-    wire lwStall;
-    wire lwStallMem;
+    wire matchRs1E_M;
+    wire matchRs2E_M;
+    wire matchRs1E_W;
+    wire matchRs2E_W;
+    wire lwStallE;
+    wire lwStallM;
+
+    assign matchRs1E_M = (RdM != 5'b0) && (RdM == Rs1E);
+    assign matchRs2E_M = (RdM != 5'b0) && (RdM == Rs2E);
+    assign matchRs1E_W = (RdW != 5'b0) && (RdW == Rs1E);
+    assign matchRs2E_W = (RdW != 5'b0) && (RdW == Rs2E);
 
     // RAW-HANDLING FORWARDING LOGIC
     always @(*) begin
         // Forward A
-        if ((RegWriteM == 1'b1) && (ResultSrcM0 == 0'b0) && (RdM != 5'b0) && (RdM == Rs1E))
+        if (RegWriteM && !ResultSrcM0 && matchRs1E_M)
             ForwardAE = 2'b10; // Forward from Memory Stage
-        else if ((RegWriteW == 1'b1) && (RdW != 5'b0) && (RdW == Rs1E))
+        else if (RegWriteW && matchRs1E_W)
             ForwardAE = 2'b01; // Forward from Writeback Stage
         else
             ForwardAE = 2'b00; // No forwarding
 
         // Forward B
-        if ((RegWriteM == 1'b1) && (ResultSrcM0 == 1'b0) && (RdM != 5'b0) && (RdM == Rs2E))
+        if (RegWriteM && !ResultSrcM0 && matchRs2E_M)
             ForwardBE = 2'b10;
-        else if ((RegWriteW == 1'b1) && (RdW != 5'b0) && (RdW == Rs2E))
+        else if (RegWriteW && matchRs2E_W)
             ForwardBE = 2'b01;
         else
             ForwardBE = 2'b00;
@@ -52,18 +61,18 @@ module HazardUnit (
 
     // STALLING LOGIC
     // If logic in E is a Load, and it writes to a register that D reads, then the control must stall
-    assign lwStall = (ResultSrcE0 == 1'b1) && (RdE != 5'b0) && ((RdE == Rs1D) || (RdE == Rs2D));
+    assign lwStallE = ResultSrcE0 && (RdE != 5'b0) && ((RdE == Rs1D) || (RdE == Rs2D));
     // Synchronous data memory: loaded data is only available in WB, so hold
     // the dependent instruction in D for one extra cycle while Load is in M.
-    assign lwStallMem = (ResultSrcM0 == 1'b1) && (RdM != 5'b0) && ((RdM == Rs1D) || (RdM == Rs2D));
+    assign lwStallM = ResultSrcM0 && (RdM != 5'b0) && ((RdM == Rs1D) || (RdM == Rs2D));
 
     // CONTROL SIGNAL LOGIC (branch/jump flushes and load-use stalls)
     always @(*) begin
-        StallF = lwStall || lwStallMem;
-        StallD = lwStall || lwStallMem;
+        StallF = lwStallE || lwStallM;
+        StallD = lwStallE || lwStallM;
         
         // Flush E if we stall or if we take a branch
-        FlushE = lwStall || lwStallMem || PCSrcE;
+        FlushE = lwStallE || lwStallM || PCSrcE;
         
         // Flush D if we take a branch
         FlushD = PCSrcE;

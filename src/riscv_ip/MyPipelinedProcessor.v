@@ -56,6 +56,7 @@ module rv_pl(
     reg         m_load_wait;
     wire        MemSyncStall;
     wire        F_stall_all, D_stall_all, E_stall_all;
+    wire [31:0] M_forward_result;
 
     // ============================================
     // HAZARD UNIT set-up
@@ -98,11 +99,12 @@ module rv_pl(
             m_load_wait <= 1'b0;
     end
 
-    assign MemSyncStall = (M_sel_result == 2'b01) && !m_load_wait && (PC_Src !== 1'b1);
+    assign MemSyncStall = (M_sel_result == 2'b01) && !m_load_wait;
     assign F_stall_all  = hz_StallF || MemSyncStall;
     assign D_stall_all  = hz_StallD || MemSyncStall;
     assign E_stall_all  = MemSyncStall;
     assign E_flush      = hz_FlushE;
+    assign M_forward_result = (M_sel_result == 2'b10) ? M_pc_p4 : M_alu_o;
 
     // ============================================
     // FETCH STAGE
@@ -230,7 +232,7 @@ module rv_pl(
     ThreeMux MuxA (
         .in0 (E_rf_rd1),
         .in1 (W_result),
-        .in2 (M_alu_o),
+        .in2 (M_forward_result),
         .sel  (ForwardAE),
         .out  (E_src_a_forwarded)
     );
@@ -239,7 +241,7 @@ module rv_pl(
     ThreeMux MuxB (
         .in0 (E_rf_rd2),
         .in1 (W_result),
-        .in2 (M_alu_o),
+        .in2 (M_forward_result),
         .sel  (ForwardBE),
         .out  (E_src_b_forwarded)
     );
