@@ -92,13 +92,15 @@ module rv_pl(
     always @(posedge clk) begin
         if (!resetn)
             m_load_wait <= 1'b0;
-        else if (M_sel_result[0] && !m_load_wait)
+        else if ((M_sel_result === 2'b01) && !m_load_wait)
             m_load_wait <= 1'b1;
         else
             m_load_wait <= 1'b0;
     end
 
-    assign MemSyncStall = M_sel_result[0] && !m_load_wait;
+    // Sync-DMEM wait applies only for known loads and must not block
+    // a taken branch/jump redirect generated in E this cycle.
+    assign MemSyncStall = (M_sel_result === 2'b01) && !m_load_wait && (PC_Src !== 1'b1);
     assign F_stall_all  = hz_StallF || MemSyncStall;
     assign D_stall_all  = hz_StallD || MemSyncStall;
     assign E_stall_all  = MemSyncStall;
