@@ -63,6 +63,7 @@ module rv_pl(
         .Rs2E        (E_rs2),
         .RdM         (M_rf_a3),
         .RegWriteM   (M_we_rf),
+        .ResultSrcM0 (M_sel_result[0]),
         .RdW         (W_rf_a3),
         .RegWriteW   (W_we_rf),
         
