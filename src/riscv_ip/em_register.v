@@ -1,6 +1,7 @@
 // Register that holds signals between the E and M stages
 module EM_Register (input wire clk,
     input wire rst_n,
+    input wire stall,      // Hold current stage values
     input wire flush,       // Clears output to 0 (NOP) for Load Hazard
 
     // Signals from control unit in E stage
@@ -34,7 +35,7 @@ module EM_Register (input wire clk,
             M_dm_wd      <= 32'b0;
             M_rf_a3      <= 5'b0;
             M_pc_p4      <= 32'b0;
-        end else begin
+        end else if (!stall) begin
             // Normal Operation: Pass everything from E to M
             M_sel_result <= E_sel_result;
             M_we_dm      <= E_we_dm;

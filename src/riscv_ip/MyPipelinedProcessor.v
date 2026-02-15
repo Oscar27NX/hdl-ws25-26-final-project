@@ -16,7 +16,6 @@ module rv_pl(
 );
     // Fetch
     wire [31:0] F_pc, F_pc_p4, F_instr, F_pc_next;
-    wire        F_stall; 
 
     // Decode
     wire [31:0] D_pc, D_pc_p4, D_instr, D_imm_ext;
@@ -25,7 +24,7 @@ module rv_pl(
     wire        D_jump, D_branch, D_we_dm, D_sel_alu_src_b, D_we_rf;
     wire [1:0]  D_sel_result;
     wire [3:0]  D_alu_control;
-    wire        D_stall, D_flush;
+    wire        D_flush;
 
     // Execute
     wire [31:0] E_pc, E_pc_p4, E_rf_rd1, E_rf_rd2, E_ext;
@@ -53,6 +52,10 @@ module rv_pl(
     // let the HU "peek" at these signals, so we can determine the hazard cases
     wire [1:0]  ForwardAE, ForwardBE;
     wire        PC_Src; 
+    wire        hz_StallF, hz_StallD, hz_FlushE;
+    reg         m_load_wait;
+    wire        MemSyncStall;
+    wire        F_stall_all, D_stall_all, E_stall_all;
 
     // ============================================
     // HAZARD UNIT set-up
@@ -75,11 +78,31 @@ module rv_pl(
 
         .ForwardAE   (ForwardAE),
         .ForwardBE   (ForwardBE),
-        .StallF      (F_stall),
-        .StallD      (D_stall),
-        .FlushE      (E_flush),
+        .StallF      (hz_StallF),
+        .StallD      (hz_StallD),
+        .FlushE      (hz_FlushE),
         .FlushD      (D_flush)
     );
+
+
+
+    // One-cycle global hold for synchronous data-memory loads.
+    // Keeps the load in M for one extra cycle so d_rdata is valid
+    // before it is captured into the M/W register.
+    always @(posedge clk) begin
+        if (!resetn)
+            m_load_wait <= 1'b0;
+        else if (M_sel_result[0] && !m_load_wait)
+            m_load_wait <= 1'b1;
+        else
+            m_load_wait <= 1'b0;
+    end
+
+    assign MemSyncStall = M_sel_result[0] && !m_load_wait;
+    assign F_stall_all  = hz_StallF || MemSyncStall;
+    assign D_stall_all  = hz_StallD || MemSyncStall;
+    assign E_stall_all  = MemSyncStall;
+    assign E_flush      = hz_FlushE;
 
     // ============================================
     // FETCH STAGE
@@ -91,7 +114,7 @@ module rv_pl(
     ProgramCounter PC (
         .clk    (clk),
         .resetn    (resetn),
-        .en     (!F_stall),
+        .en     (!F_stall_all),
         .pc_in  (F_pc_next),
         .pc_out (F_pc)
     );
@@ -112,7 +135,7 @@ module rv_pl(
     FD_register PLR1 (
         .clk     (clk),
         .rst_n   (resetn),
-        .stall   (F_stall),
+        .stall   (D_stall_all),
         .flush   (D_flush), 
         .F_pc    (F_pc),
         .F_pc4   (F_pc_p4),
@@ -160,6 +183,7 @@ module rv_pl(
     DE_Register PLR2 (
         .clk              (clk),
         .rst_n            (resetn),
+        .stall            (E_stall_all),
         .flush            (E_flush),
         
         .D_pc             (D_pc),
@@ -244,6 +268,7 @@ module rv_pl(
     EM_Register PLR3 (
         .clk            (clk),
         .rst_n          (resetn),
+        .stall          (E_stall_all),
         .flush          (1'b0),
         
         .E_alu_o        (E_alu_o),
@@ -283,6 +308,7 @@ module rv_pl(
     MW_Register PLR4 (
         .clk            (clk),
         .rst_n          (resetn),
+        .stall          (E_stall_all),
         .flush          (1'b0),
         
         .M_dm_rd        (M_dm_rd),

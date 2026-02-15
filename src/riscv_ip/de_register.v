@@ -1,6 +1,7 @@
 // Register that holds signals between the D and E stages
 module DE_Register (input wire clk,
     input wire rst_n,
+    input wire stall,      // Hold current stage values
     input wire flush,       // Clears output to 0 (NOP) for Load Hazard
 
     // Signals from control unit in D stage
@@ -54,7 +55,7 @@ module DE_Register (input wire clk,
             E_pc <= 32'b0; E_rf_rd1 <= 32'b0; E_rf_rd2 <= 32'b0;
             E_ext <= 32'b0; E_rf_a3 <= 5'b0; E_pc_p4 <= 32'b0;
             E_rs1 <= 5'b0; E_rs2 <= 5'b0;
-        end else begin
+        end else if (!stall) begin
             // Normal Operation: Pass everything
             E_jump          <= D_jump;
             E_branch        <= D_branch;

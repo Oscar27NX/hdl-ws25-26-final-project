@@ -2,6 +2,7 @@
 module MW_Register (
     input wire clk,
     input wire rst_n,
+    input wire stall,      // Hold current stage values
     input wire flush,     
 
     // Signals from control unit in M stage
@@ -31,7 +32,7 @@ module MW_Register (
             W_alu_o      <= 32'b0;
             W_rf_a3      <= 5'b0;
             W_pc_p4      <= 32'b0;
-        end else begin
+        end else if (!stall) begin
             W_sel_result <= M_sel_result;
             W_we_rf      <= M_we_rf;
             W_dm_rd      <= M_dm_rd;
