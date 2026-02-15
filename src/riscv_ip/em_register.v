@@ -13,6 +13,7 @@ module EM_Register (input wire clk,
     input wire [31:0] E_alu_o,     // ALU Result (Address for Mem)
     input wire [31:0] E_dm_wd,     // Data to write to Mem  
     input wire [4:0]  E_rf_a3,     // Destination Register Address
+    input wire [4:0]  E_rs2,
     input wire [31:0] E_pc_p4,
 
     // Output signals to M stage
@@ -22,6 +23,7 @@ module EM_Register (input wire clk,
     output reg [31:0] M_alu_o,
     output reg [31:0] M_dm_wd,
     output reg [4:0]  M_rf_a3,
+    output reg [4:0]  M_rs2,
     output reg [31:0] M_pc_p4
 );
 
@@ -34,6 +36,7 @@ module EM_Register (input wire clk,
             M_alu_o      <= 32'b0;
             M_dm_wd      <= 32'b0;
             M_rf_a3      <= 5'b0;
+            M_rs2        <= 5'b0;
             M_pc_p4      <= 32'b0;
         end else if (!stall) begin
             // Normal Operation: Pass everything from E to M
@@ -43,6 +46,7 @@ module EM_Register (input wire clk,
             M_alu_o      <= E_alu_o;
             M_dm_wd      <= E_dm_wd;
             M_rf_a3      <= E_rf_a3;
+            M_rs2        <= E_rs2;
             M_pc_p4      <= E_pc_p4;
         end
     end

@@ -38,7 +38,7 @@ module rv_pl(
 
     // Memory
     wire [31:0] M_pc_p4, M_alu_o, M_dm_wd, M_dm_rd;
-    wire [4:0]  M_rf_a3;
+    wire [4:0]  M_rf_a3, M_rs2;
     wire        M_we_dm, M_we_rf;
     wire [1:0]  M_sel_result;
 
@@ -51,11 +51,12 @@ module rv_pl(
     // Hazard Control Signals
     // let the HU "peek" at these signals, so we can determine the hazard cases
     wire [1:0]  ForwardAE, ForwardBE;
+    wire        ForwardStoreM;
     wire        PC_Src; 
-    wire        hz_StallF, hz_StallD, hz_FlushE;
+    wire        hz_StallF, hz_StallD, hz_StallE, hz_FlushE;
     reg         m_load_wait;
     wire        MemSyncStall;
-    wire        F_stall_all, D_stall_all, E_stall_all;
+    wire        F_stall_all, D_stall_all, E_stage_stall, MW_stall;
     wire [31:0] M_forward_result;
 
     // ============================================
@@ -70,6 +71,8 @@ module rv_pl(
         .ResultSrcM0 (M_sel_result[0]),
         .RdW         (W_rf_a3),
         .RegWriteW   (W_we_rf),
+        .Rs2M        (M_rs2),
+        .MemWriteM   (M_we_dm),
         
         .Rs1D        (D_instr[19:15]),
         .Rs2D        (D_instr[24:20]),
@@ -79,8 +82,10 @@ module rv_pl(
 
         .ForwardAE   (ForwardAE),
         .ForwardBE   (ForwardBE),
+        .ForwardStoreM(ForwardStoreM),
         .StallF      (hz_StallF),
         .StallD      (hz_StallD),
+        .StallE      (hz_StallE),
         .FlushE      (hz_FlushE),
         .FlushD      (D_flush)
     );
@@ -102,7 +107,8 @@ module rv_pl(
     assign MemSyncStall = (M_sel_result == 2'b01) && !m_load_wait;
     assign F_stall_all  = hz_StallF || MemSyncStall;
     assign D_stall_all  = hz_StallD || MemSyncStall;
-    assign E_stall_all  = MemSyncStall;
+    assign E_stage_stall = MemSyncStall || hz_StallE;
+    assign MW_stall      = MemSyncStall;
     assign E_flush      = hz_FlushE;
     assign M_forward_result = (M_sel_result == 2'b10) ? M_pc_p4 : M_alu_o;
 
@@ -185,7 +191,7 @@ module rv_pl(
     DE_Register PLR2 (
         .clk              (clk),
         .rst_n            (resetn),
-        .stall            (E_stall_all),
+        .stall            (E_stage_stall),
         .flush            (E_flush),
         
         .D_pc             (D_pc),
@@ -270,13 +276,14 @@ module rv_pl(
     EM_Register PLR3 (
         .clk            (clk),
         .rst_n          (resetn),
-        .stall          (E_stall_all),
+        .stall          (E_stage_stall),
         .flush          (1'b0),
         
         .E_alu_o        (E_alu_o),
         // Source depends on forwarding logic determined by 3-way Mux
         .E_dm_wd        (E_src_b_forwarded), 
         .E_rf_a3        (E_rf_a3),
+        .E_rs2          (E_rs2),
         .E_pc_p4        (E_pc_p4),
         
         .E_sel_result   (E_sel_result),
@@ -286,6 +293,7 @@ module rv_pl(
         .M_alu_o        (M_alu_o),
         .M_dm_wd        (M_dm_wd),
         .M_rf_a3        (M_rf_a3),
+        .M_rs2          (M_rs2),
         .M_pc_p4        (M_pc_p4),
         
         .M_sel_result   (M_sel_result),
@@ -298,7 +306,7 @@ module rv_pl(
     // ============================================
 
     assign d_addr = M_alu_o;
-    assign d_wdata = M_dm_wd;
+    assign d_wdata = ForwardStoreM ? W_result : M_dm_wd;
     // write the bit en signal for annoying vivado 
     assign d_we = {4{M_we_dm}};
 
@@ -310,7 +318,7 @@ module rv_pl(
     MW_Register PLR4 (
         .clk            (clk),
         .rst_n          (resetn),
-        .stall          (E_stall_all),
+        .stall          (MW_stall),
         .flush          (1'b0),
         
         .M_dm_rd        (M_dm_rd),
