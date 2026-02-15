@@ -1,18 +1,19 @@
-// the memory/writeback register module
+// Memory/Writeback register module
+// Added: stall input to freeze during BRAM latency stalls
 module MW_Register (
     input wire clk,
     input wire rst_n,
-    input wire stall,      // Hold current stage values
-    input wire flush,     
+    input wire flush,
+    input wire stall,       // Hold values during BRAM stall
 
     // Signals from control unit in M stage
     input wire [1:0] M_sel_result,
     input wire M_we_rf,
 
     // More signals from the M stage
-    input wire [31:0] M_dm_rd,     
-    input wire [31:0] M_alu_o,     
-    input wire [4:0]  M_rf_a3,     
+    input wire [31:0] M_dm_rd,
+    input wire [31:0] M_alu_o,
+    input wire [4:0]  M_rf_a3,
     input wire [31:0] M_pc_p4,
 
     // Output signals to W stage
@@ -40,5 +41,6 @@ module MW_Register (
             W_rf_a3      <= M_rf_a3;
             W_pc_p4      <= M_pc_p4;
         end
+        // else: stall — hold current values
     end
 endmodule

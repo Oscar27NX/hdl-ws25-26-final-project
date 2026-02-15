@@ -24,13 +24,6 @@ module RegisterFile #(parameter WIDTH = 32)(
                        registers[rs2];
     integer i;
 
-    // Deterministic simulation/startup state.
-    // Synthesis tools for FPGA map register initials to reset values.
-    initial begin
-        for (i = 0; i < 32; i = i + 1)
-            registers[i] = {WIDTH{1'b0}};
-    end
-
     // Write operation (synchronous => sequential)
     always @(posedge clk) begin
         if (reg_write && (rd != 5'b0)) begin

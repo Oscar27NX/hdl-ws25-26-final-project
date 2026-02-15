@@ -1,8 +1,9 @@
 // Register that holds signals between the E and M stages
+// Added: stall input to freeze during BRAM latency stalls
 module EM_Register (input wire clk,
     input wire rst_n,
-    input wire stall,      // Hold current stage values
-    input wire flush,       // Clears output to 0 (NOP) for Load Hazard
+    input wire flush,
+    input wire stall,       // Hold values during BRAM stall
 
     // Signals from control unit in E stage
     input wire [1:0] E_sel_result,
@@ -10,9 +11,9 @@ module EM_Register (input wire clk,
     input wire E_we_rf,
 
     // More signals from the E stage
-    input wire [31:0] E_alu_o,     // ALU Result (Address for Mem)
-    input wire [31:0] E_dm_wd,     // Data to write to Mem  
-    input wire [4:0]  E_rf_a3,     // Destination Register Address
+    input wire [31:0] E_alu_o,
+    input wire [31:0] E_dm_wd,
+    input wire [4:0]  E_rf_a3,
     input wire [31:0] E_pc_p4,
 
     // Output signals to M stage
@@ -27,7 +28,6 @@ module EM_Register (input wire clk,
 
     always @(posedge clk) begin
         if (!rst_n || flush) begin
-            // noop or Flush: Set control signals to safe defaults (0)
             M_sel_result <= 2'b0;
             M_we_dm      <= 1'b0;
             M_we_rf      <= 1'b0;
@@ -36,7 +36,6 @@ module EM_Register (input wire clk,
             M_rf_a3      <= 5'b0;
             M_pc_p4      <= 32'b0;
         end else if (!stall) begin
-            // Normal Operation: Pass everything from E to M
             M_sel_result <= E_sel_result;
             M_we_dm      <= E_we_dm;
             M_we_rf      <= E_we_rf;
@@ -45,5 +44,6 @@ module EM_Register (input wire clk,
             M_rf_a3      <= E_rf_a3;
             M_pc_p4      <= E_pc_p4;
         end
+        // else: stall — hold current values
     end
 endmodule
