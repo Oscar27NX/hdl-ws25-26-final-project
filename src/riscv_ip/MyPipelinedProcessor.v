@@ -64,6 +64,7 @@ module rv_pl(
         .RdM         (M_rf_a3),
         .RegWriteM   (M_we_rf),
         .RdW         (W_rf_a3),
+        .ResultSrcM0 (M_sel_result[0]), 
         .RegWriteW   (W_we_rf),
         
         .Rs1D        (D_instr[19:15]),
