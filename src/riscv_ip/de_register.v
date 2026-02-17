@@ -1,9 +1,9 @@
-// Register that holds signals between the D and E stages
-// Added: stall input to freeze during BRAM latency stalls
+// Register that holds signals between the D and E stages of the pipeline.
+// It also handles flushing (for load hazards) and stalling (for BRAM stalls).
 module DE_Register (input wire clk,
     input wire rst_n,
-    input wire flush,       // Clears output to 0 (NOP) for Load Hazard
-    input wire stall,       // Hold values during BRAM stall
+    input wire flush,       // Clears output to 0 (NOP) for a Load Hazard
+    input wire stall,       // Hold values during a BRAM stall
 
     // Signals from control unit in D stage
     input wire D_jump,
@@ -51,8 +51,9 @@ module DE_Register (input wire clk,
             E_ext <= 32'b0; E_rf_a3 <= 5'b0; E_pc_p4 <= 32'b0;
             E_rs1 <= 5'b0; E_rs2 <= 5'b0;
         end else if (stall) begin
-            // BRAM stall: hold all current values
+            // BRAM stall: just hold all current values
         end else if (flush) begin
+            // load hazard means we need to flush the E stage and insert a NOP
             E_jump <= 1'b0; E_branch <= 1'b0; E_sel_result <= 2'b0;
             E_we_dm <= 1'b0; E_alu_control <= 4'b0;
             E_sel_alu_src_b <= 1'b0; E_we_rf <= 1'b0;
@@ -60,6 +61,7 @@ module DE_Register (input wire clk,
             E_ext <= 32'b0; E_rf_a3 <= 5'b0; E_pc_p4 <= 32'b0;
             E_rs1 <= 5'b0; E_rs2 <= 5'b0;
         end else begin
+            // update sequentally on clock edge if no stall or flush
             E_jump          <= D_jump;
             E_branch        <= D_branch;
             E_sel_result    <= D_sel_result;

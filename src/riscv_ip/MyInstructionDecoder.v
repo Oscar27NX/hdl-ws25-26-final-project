@@ -7,13 +7,15 @@ module InstructionDecoder (
     output reg [31:0] imm_ext 
 );
 
-    // Field Extraction according to RISC-V manual
+    // Bit Extraction according to the RISC-V 32i manual
     assign opcode = instr[6:0];
     assign funct3 = instr[14:12];
     assign funct7 = instr[31:25];
 
-    // Combinational Sign Extension with PC Correction
+    // Sign Extension with PC
     always @(*) begin
+        // we simply use the opcode as it is in the man to define the instruction type and how to extract
+        //  and sign-extend the immediate value accordingly
         case (opcode)
             // I-Type (LW, ADDI, JALR)
             7'b0000011, 7'b0010011, 7'b1100111: begin 

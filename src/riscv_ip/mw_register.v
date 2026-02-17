@@ -3,7 +3,7 @@
 module MW_Register (
     input wire clk,
     input wire rst_n,
-    input wire flush,
+    input wire flush,       // Clears output to 0 (NOP) for load hazards
     input wire stall,       // Hold values during BRAM stall
 
     // Signals from control unit in M stage
@@ -26,6 +26,7 @@ module MW_Register (
 );
 
     always @(posedge clk) begin
+        // if core is reset or we need to flush (load hazard), clear all outputs to 0 (NOP)
         if (!rst_n || flush) begin
             W_sel_result <= 2'b0;
             W_we_rf      <= 1'b0;
@@ -34,6 +35,7 @@ module MW_Register (
             W_rf_a3      <= 5'b0;
             W_pc_p4      <= 32'b0;
         end else if (!stall) begin
+        // update sequentally on clock edge if no stall
             W_sel_result <= M_sel_result;
             W_we_rf      <= M_we_rf;
             W_dm_rd      <= M_dm_rd;
@@ -41,6 +43,6 @@ module MW_Register (
             W_rf_a3      <= M_rf_a3;
             W_pc_p4      <= M_pc_p4;
         end
-        // else: stall — hold current values
+        // else: stall and hold current values
     end
 endmodule

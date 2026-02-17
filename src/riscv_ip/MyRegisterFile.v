@@ -1,4 +1,4 @@
-// 32-bit register file module
+// the 32-bit register file module
 module RegisterFile #(parameter WIDTH = 32)(
     input clk,                  
     input wire [4:0] rs1,    

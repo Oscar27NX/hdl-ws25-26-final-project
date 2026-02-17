@@ -1,36 +1,40 @@
-// Pipelined RISC-V processor for FPGA BRAM deployment
-// Fixes:
-//   1. IRAM 1-cycle latency: F_pc_r aligns PC with BRAM instruction output
-//   2. DRAM 1-cycle latency: bramStall in HazardUnit holds pipeline for loads
-//   3. 2-cycle branch flush: accounts for BRAM fetch delay after PC redirect
+// Pipelined RISC-V processor for FPGA-BRAM deployment
+
 module rv_pl(
+    // EXPOSED INPUT/OUTPUT PORTS
     input wire clk,
     input wire resetn,
 
-    // Instruction Memory Interface (BRAM Port B - read only)
+    // Instruction Memory Interface (BRAM Port B,read only)
     output wire [31:0] i_addr,
     input wire [31:0]  i_instr,
 
-    // Data Memory Interface (BRAM Port B - read/write)
+    // Data Memory Interface (BRAM Port B)
     output wire [31:0] d_addr,
     output wire [31:0] d_wdata,
+
+    // d_we is 4 bits for byte-enable as per vivado default bram generator config;
+    // we use 0xF for word stores and 0x0 for no stores at all
     output wire [3:0] d_we,
     input wire [31:0]  d_rdata
 );
+    // WIRES (internal connections between modules)
 
-    // ============================================
-    // WIRE DECLARATIONS
-    // ============================================
+    // Fetch stage:
 
-    // Fetch
+    // we need F_pc_p4 to see the next sequential PC.
+    // this is used for branch target calculation and the jump register instructions.
     wire [31:0] F_pc, F_pc_p4, F_pc_next;
     wire        F_stall;
 
-    // Fetch-aligned PC (delayed 1 cycle to match BRAM output)
+    // Fetch-aligned PC:
+    // since BRAM causes a 1-cycle delay due to synchronous reads, we need to use
+    //  a registered version of F_pc for the FD register and the next instruction input, so that they are correctly aligned.
+    // This is because the BRAM will instead output the instruction corresponding to the LATCHED address from the previous cycle, which is F_pc_r.
     reg  [31:0] F_pc_r;
     wire [31:0] F_pc_r_p4;
 
-    // Decode
+    // Decode stage
     wire [31:0] D_pc, D_pc_p4, D_instr, D_imm_ext;
     wire [31:0] D_rf_rd1, D_rf_rd2;
     wire [4:0]  D_rf_a3;
@@ -39,7 +43,7 @@ module rv_pl(
     wire [3:0]  D_alu_control;
     wire        D_stall, D_flush;
 
-    // Execute
+    // Execute stage
     wire [31:0] E_pc, E_pc_p4, E_rf_rd1, E_rf_rd2, E_ext;
     wire [31:0] E_alu_src_b, E_alu_o, E_target_pc;
     wire [31:0] E_src_a_forwarded, E_src_b_forwarded;
@@ -49,31 +53,41 @@ module rv_pl(
     wire [3:0]  E_alu_control;
     wire        E_zero, E_flush;
 
-    // Memory
+    // Memory stage
     wire [31:0] M_pc_p4, M_alu_o, M_dm_wd, M_dm_rd;
     wire [4:0]  M_rf_a3;
     wire        M_we_dm, M_we_rf;
     wire [1:0]  M_sel_result;
 
-    // Writeback
+    // Writeback stage
     wire [31:0] W_pc_p4, W_alu_o, W_dm_rd, W_result;
     wire [4:0]  W_rf_a3;
     wire        W_we_rf;
     wire [1:0]  W_sel_result;
 
     // Hazard signals
+    // the forwarding signals (ForwardAE and ForwardBE) determine where the ALU sources in the E stage get their data from:
+    // 00 = from register file, 01 = from W stage (writeback), 10 = from M stage (memory)
+    // AE corresponds to the first ALU operand (rs1) and BE corresponds to the second ALU operand (rs2 or immediate)
     wire [1:0]  ForwardAE, ForwardBE;
     wire        PC_Src;
+
+   // the new stall and flush signals from the Hazard Unit, which are used
+   // for control stalling and flushing of the pipeline registers in ALL stages.
     wire        StallE, StallM;
     wire        MemReadM;
 
+   // the value of MemReadM is determined by the instruction in the M stage.
+   // If the instruction in M stage is a load (sel_result = 01), then we need to stall the pipeline because of BRAM latency,
+   // and we also need to forward the loaded value from M stage instead of W stage.
     assign MemReadM = (M_sel_result == 2'b01);
 
     // ============================================
-    // IRAM LATENCY FIX: F_pc_r
+    // MANAGE IRAM LATENCY: F_pc_r
     // ============================================
-    // BRAM latches i_addr at posedge and outputs data AFTER the edge.
-    // F_pc_r is a registered copy of F_pc, so it's aligned with i_instr.
+    // BRAM latches the i_addr at posedge and outputs data AFTER the edge!
+    // F_pc_r is a registered copy of F_pc, so it's aligned with i_instr by design.
+    // We use F_pc_r for the FD register and the next PC calculation, so that they are correctly paired with the instruction coming out of BRAM.
     // FD register receives (F_pc_r, fd_instr_in) = correctly paired.
     always @(posedge clk) begin
         if (!resetn)
@@ -83,14 +97,14 @@ module rv_pl(
     end
 
     // ============================================
-    // INSTRUCTION BUFFER (fixes BRAM corruption during stalls)
+    // INSTRUCTION BUFFER
     // ============================================
-    // Problem: During stalls, BRAM address register (external) keeps
-    // latching F_pc, overwriting the correct instruction. When stall
+    // The main solution to our problem: During stalls, BRAM address register (external) keeps
+    // latching the value in F_pc, overwriting the correct instruction that was being executed. When stall then
     // releases, BRAM outputs wrong instruction.
-    // Fix: On first cycle of stall, i_instr is still valid (BRAM hasn't
-    // re-latched yet due to NBA semantics). Save it in a buffer.
-    // Use buffer when stall releases.
+    // So instead: on first cycle of stall we know i_instr is still valid (sequential update)
+    // So in the meantime, save it in a buffer.
+    // Then read from the buffer when stall releases.
     reg [31:0] instr_buf;
     reg        instr_buf_valid;
     always @(posedge clk) begin
@@ -136,6 +150,7 @@ module rv_pl(
     // HAZARD UNIT
     // ============================================
 
+    // instantiate the Hazard Unit and connect all its signals
     HazardUnit HU (
         .clk         (clk),
         .rst_n       (resetn),
@@ -168,6 +183,8 @@ module rv_pl(
     // FETCH STAGE
     // ============================================
 
+    // assign the next value in PC address in case of a jump or taken branch,
+    // otherwise PC+4 for next sequential instruction as normal
     assign PC_Src = E_jump | (E_branch & E_zero);
     assign F_pc_next = (PC_Src) ? E_target_pc : F_pc_p4;
 
@@ -185,12 +202,14 @@ module rv_pl(
         .sum (F_pc_p4)
     );
 
+    // next address to fetch is either from the PC (normal operation)
+    // or it is held constant during a stall (F_stall = 1)
     assign i_addr = F_pc;
 
     // ============================================
     // PIPE: F -> D
     // ============================================
-    // Uses F_pc_r (aligned with BRAM output) instead of F_pc
+    // Uses F_pc_r (aligned with BRAM output)
 
     FD_register PLR1 (
         .clk     (clk),
@@ -209,6 +228,9 @@ module rv_pl(
     // DECODE STAGE
     // ============================================
 
+    // this is the destination register address for writing back results to the RF,
+    // which is needed in the hazard unit for forwarding and stalling decisions,
+    // and also needed in the DE register to pass to later stages.
     assign D_rf_a3 = D_instr[11:7];
 
     Controller Controller (
@@ -240,6 +262,8 @@ module rv_pl(
     // PIPE: D -> E
     // ============================================
 
+    // instantiate the DE pipeline register and connect all its signals as the
+    // architecture states.
     DE_Register PLR2 (
         .clk              (clk),
         .rst_n            (resetn),
@@ -285,6 +309,9 @@ module rv_pl(
     // EXECUTE STAGE
     // ============================================
 
+    // prepare the muxes for the forwarding logic in the E stage.
+    // The Hazard Unit determines the control signals ForwardAE and ForwardBE to decide
+    //  where the ALU sources get their data from.
     ThreeMux MuxA (
         .in0 (E_rf_rd1), .in1 (W_result), .in2 (M_alu_o),
         .sel (ForwardAE), .out (E_src_a_forwarded)
@@ -295,12 +322,16 @@ module rv_pl(
         .sel (ForwardBE), .out (E_src_b_forwarded)
     );
 
+    // branch adder to calculate the target address for branches and jumps.
+    // This is used when PCSrcE = 1 to update the PC to the target address.
     Adder Branch_Adder (
         .a   (E_pc),
         .b   (E_ext),
         .sum (E_target_pc)
     );
 
+    // the second ALU operand is either the forwarded value from the register file (after passing through MuxB) or
+    //  the immediate value (after extension), depending on the instruction type!
     assign E_alu_src_b = (E_sel_alu_src_b) ? E_ext : E_src_b_forwarded;
 
     ALU ALU (
@@ -331,6 +362,10 @@ module rv_pl(
 
     assign d_addr  = M_alu_o;
     assign d_wdata = M_dm_wd;
+
+    // write M_we_dm to all 4 bits of d_we for word stores, or 0 for no store.
+    // this is because the BRAM generator IP in vivado is configured for 32-bit data with 4-bit byte enables,
+    // so we need to use the byte enables to control writes.
     assign d_we    = {4{M_we_dm}};
     assign M_dm_rd = d_rdata;
 
@@ -352,6 +387,9 @@ module rv_pl(
     // WRITEBACK STAGE
     // ============================================
 
+    // the value to write back to the RF in the W stage is determined by the control signal W_sel_result:
+    // 00 = from ALU (R-type, I-type arithmetic), 01 = from Data Memory (loads),
+    //  10 = from PC+4 (JAL, JALR), 00 = default 0 (NOP)
     assign W_result = (W_sel_result == 2'b00) ? W_alu_o :
                       (W_sel_result == 2'b01) ? W_dm_rd :
                       (W_sel_result == 2'b10) ? W_pc_p4 : 32'b0;

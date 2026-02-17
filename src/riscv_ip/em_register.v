@@ -1,5 +1,5 @@
-// Register that holds signals between the E and M stages
-// Added: stall input to freeze during BRAM latency stalls
+// Register that holds signals between the E and M stages of the pipeline.
+// It also handles flushing (for load hazards) and stalling (for BRAM stalls).
 module EM_Register (input wire clk,
     input wire rst_n,
     input wire flush,
@@ -27,6 +27,7 @@ module EM_Register (input wire clk,
 );
 
     always @(posedge clk) begin
+        // if core is reset or we need to flush (load hazard), clear all outputs to 0 (NOP)
         if (!rst_n || flush) begin
             M_sel_result <= 2'b0;
             M_we_dm      <= 1'b0;
@@ -35,6 +36,7 @@ module EM_Register (input wire clk,
             M_dm_wd      <= 32'b0;
             M_rf_a3      <= 5'b0;
             M_pc_p4      <= 32'b0;
+        // update sequentally on clock edge if no stall
         end else if (!stall) begin
             M_sel_result <= E_sel_result;
             M_we_dm      <= E_we_dm;
@@ -44,6 +46,6 @@ module EM_Register (input wire clk,
             M_rf_a3      <= E_rf_a3;
             M_pc_p4      <= E_pc_p4;
         end
-        // else: stall — hold current values
+        // else: stall and hold current values
     end
 endmodule

@@ -1,4 +1,5 @@
-// Second level decoding for the specific alu operations
+// Performs second level decoding to assign the correct
+// control signals to the ALU based on the instruction type and function codes.
 module ALU_Decoder (
     input wire [1:0] ALUOp,      // From Controller
     input wire [2:0] funct3,      // From Instruction [14:12]
@@ -7,6 +8,7 @@ module ALU_Decoder (
     output reg [3:0] ALUControl  // To ALU
 );
 
+   // we stick to riscv32i man ALU control encoding
     always @(*) begin
         case (ALUOp)
             // Mode 00: LW / SW / PC+4 (Force ADD)

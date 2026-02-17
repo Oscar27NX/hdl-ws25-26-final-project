@@ -1,8 +1,8 @@
-// Register that holds signals between the F and D stages
+// Register that holds signals between the F and D stages of the pipeline.
 module FD_register (
     input wire clk,
     input wire rst_n,      
-    input wire stall,      // also Stall only for this stage since F stage PC is handled separately
+    input wire stall,      // also stall for this stage since F stage PC is handled separately
     input wire flush,      // Flush D stage on branch
 
     // Inputs from the F stage
@@ -24,13 +24,13 @@ module FD_register (
             D_pc4 <= 32'b0;
         end
         else if (flush) begin
-            // Flush pipeline
+            // Flush pipeline with NOP (ADDI x0, x0, 0) on branch
             D_pc <= 32'b0;
             D_instr <= 32'h00000013; 
             D_pc4 <= 32'b0;
         end
         else if (!stall) begin
-            // Stall handles the PC separately, so just pass values
+            // Stall handles the PC separately, so just pass values without worries
             D_pc <= F_pc;
             D_instr <= F_instr;
             D_pc4 <= F_pc4;

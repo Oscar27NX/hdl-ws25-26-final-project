@@ -1,4 +1,5 @@
 // Composed of first level decoder (instruction type) and second level decoder (alu control)
+// mostly a wrapper to connect the two decoders and pass the correct signals to the datapath.
 module Controller (
     input wire clk,
     input wire [31:0] instr,  
@@ -20,6 +21,8 @@ module Controller (
     wire [6:0] funct7;
     wire [1:0] alu_op; 
 
+    // instantiate the instruction decoder which will output the
+    // opcode, funct3, funct7, and immediate value (after extension) from the instruction
     InstructionDecoder ID (
         .instr(instr),
         .opcode(opcode),
@@ -28,6 +31,8 @@ module Controller (
         .imm_ext(imm_ext)
     );
 
+    // the main decoder will take the opcode and output the main control signals for the datapath
+    // as well as the ALUOp bits for the ALU decoder
     Main_Decoder CU (
         .opcode(opcode),
         .reg_write(d_we_rf),
@@ -39,6 +44,8 @@ module Controller (
         .alu_op(alu_op)
     );
 
+    // the ALU decoder takes the ALUOp bits from the main decoder and the funct3/funct7 from the instruction
+    // to determine the exact ALU control signals to send to the ALU for the correct operation
     ALU_Decoder ALU_Dec (
         .ALUOp(alu_op),
         .funct3(funct3),

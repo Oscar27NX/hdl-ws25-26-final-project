@@ -1,8 +1,9 @@
-// Testbench for pipelined RISC-V with synchronous BRAM models
-// Models real FPGA BRAM behavior: 1-cycle read latency
+// Testbench for pipelined RISC-V with SYNCHRONOUS BRAM models
+// Models real FPGA BRAM behavior: we have 1-cycle read latency!
 `timescale 1ns/1ps
 
 module tb_rv_pl;
+    // Manually drive clock and reset
     reg clk, resetn;
     
     // Instruction BRAM interface
@@ -15,7 +16,7 @@ module tb_rv_pl;
     wire [3:0]  d_we;
     reg  [31:0] d_rdata;
     
-    // Instantiate DUT
+    // Instantiate the DUT
     rv_pl DUT (
         .clk     (clk),
         .resetn  (resetn),
@@ -43,13 +44,13 @@ module tb_rv_pl;
     end
     assign i_instr_sync = IRAM[i_addr_reg[13:2]];
     
-    // Use synchronous model (matches real FPGA BRAM)
+    // Use a synchronous model
     always @(*) begin
         i_instr = IRAM[i_addr_reg[13:2]];
     end
     
     // =========================================================
-    // SYNCHRONOUS DATA BRAM (1-cycle read latency + sync write)
+    // SYNCHRONOUS DATA BRAM (1-cycle read latency & sync write)
     // =========================================================
     reg [31:0] DRAM [0:4095];
     reg [31:0] d_addr_reg;

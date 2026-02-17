@@ -1,4 +1,6 @@
-// This unit receives the opcode to breakdwown control signals for the ALU and other units
+// This unit receives the opcode from the instruction decoder to breakdwown
+// further control signals for the ALU and the datapath. It performs the first level of decoding to determine
+// the instruction type and sets the main control signals accordingly.
 module Main_Decoder (
     input  wire [6:0] opcode,
     output reg       reg_write,
@@ -11,10 +13,11 @@ module Main_Decoder (
 );
 
     always @(*) begin
-        // Defaults to prevent latches
+        // Defaults to prevent latches after updates
         reg_write = 0; mem_write = 0; alu_src = 0; 
         result_src = 0; branch = 0; jump = 0; alu_op = 0;
 
+        // Again, we use riscv32i opcode values to determine the instruction type and set control signals accordingly
         case (opcode)
             // R-Type (ADD, SUB, OR, etc.)
             7'b0110011: begin 
@@ -70,7 +73,7 @@ module Main_Decoder (
             7'b0110111: begin
                 reg_write = 1;
                 alu_src   = 1;     // Use Immediate
-                alu_op    = 2'b11; // Special "LUI" O
+                alu_op    = 2'b11; // Special "LUI" operation
             end
 
             default:

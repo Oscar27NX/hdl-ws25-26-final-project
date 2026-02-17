@@ -1,4 +1,4 @@
-// ALU Module. It uses the register with the given control signals to perform operations.
+// ALU Module. It uses the register with decoded control signals to perform operations.
 module ALU(
     input wire [3:0] alu_control,
     input wire [31:0] operand_a,
@@ -6,9 +6,13 @@ module ALU(
     output reg [31:0] alu_result,
     output zero
 );
+    // directly tells the control unit if the result is zero for branch decisions
     assign zero = (alu_result == 32'b0);
 
     always @(*) begin
+        // not much mistery here:
+        // we directly analyze the decoded control signals 
+        // from the ALU decoder to determine the operation to perform
         case (alu_control)
             // ADD / ADDI / LW / SW: Funct3=000, Funct7[5]=0
             4'b0000: alu_result = operand_a + operand_b;  
