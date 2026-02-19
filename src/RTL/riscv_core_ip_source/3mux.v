@@ -4,8 +4,8 @@ module ThreeMux (
                       // 01: Forward from EX stage
                       // 10: Forward from MEM stage
     input wire [31:0] in0,  // RF stage read data
-    input wire [31:0] in1,  // EX ALU Result (Prev Instr)
-    input wire [31:0] in2,  // MEM ALU Result (Prev-Prev Instr)
+    input wire [31:0] in1,  // W_result
+    input wire [31:0] in2,  // MEM ALU Output
     output reg [31:0] out
 );
     always @(*) begin

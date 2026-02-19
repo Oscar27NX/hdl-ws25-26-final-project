@@ -1,9 +1,9 @@
 // Testbench for pipelined RISC-V with SYNCHRONOUS BRAM models
-// Models real FPGA BRAM behavior: we have 1-cycle read latency!
+// Models real FPGA BRAM behavior: because we actually have a 1-cycle read latency!
 `timescale 1ns/1ps
 
 module tb_rv_pl;
-    // Manually drive clock and reset
+    // Manually driven clock and reset
     reg clk, resetn;
     
     // Instruction BRAM interface
@@ -34,7 +34,7 @@ module tb_rv_pl;
     
     // =========================================================
     // SYNCHRONOUS INSTRUCTION BRAM (1-cycle read latency)
-    // Address latched on posedge, data available after
+    // Address latched on posedge => data available after
     // =========================================================
     reg [31:0] IRAM [0:4095];
     reg [31:0] i_addr_reg;
@@ -145,22 +145,7 @@ module tb_rv_pl;
         if (errors == 0) $display("PASS"); else $display("FAILED with %0d errors", errors);
         
         // =======================================================
-        // TEST 2: Store then Load (THE critical BRAM test)
-        // addi x1, x0, 99   -> x1 = 99
-        // sw   x1, 0(x0)    -> DRAM[0] = 99
-        // nop (x5)
-        // nop
-        // nop
-        // nop
-        // nop
-        // lw   x2, 0(x0)    -> x2 should be 99
-        // nop (x5)
-        // nop
-        // nop
-        // nop
-        // nop
-        // sw   x2, 4(x0)    -> DRAM[1] = x2 (should be 99)
-        // beq  x0, x0, 0
+        // TEST 2: Store then Load
         // =======================================================
         test_num = 2;
         $display("\n=== TEST %0d: Store then Load (with NOPs) ===", test_num);
@@ -191,21 +176,6 @@ module tb_rv_pl;
         
         // =======================================================
         // TEST 3: Load immediately used (load-use + BRAM stall)
-        // addi x1, x0, 55   -> x1 = 55
-        // sw   x1, 0(x0)    -> DRAM[0] = 55
-        // nop x5
-        // nop
-        // nop
-        // nop
-        // nop
-        // lw   x2, 0(x0)    -> x2 = 55
-        // addi x3, x2, 10   -> x3 = 65 (load-use hazard!)
-        // nop x5
-        // nop
-        // nop
-        // nop
-        // sw   x3, 4(x0)    -> DRAM[1] = 65
-        // beq  x0, x0, 0
         // =======================================================
         test_num = 3;
         $display("\n=== TEST %0d: Load-use hazard ===", test_num);
@@ -236,24 +206,6 @@ module tb_rv_pl;
         
         // =======================================================
         // TEST 4: Two consecutive loads
-        // addi x1, x0, 10   -> x1 = 10
-        // addi x2, x0, 20   -> x2 = 20
-        // sw   x1, 0(x0)    -> DRAM[0] = 10
-        // sw   x2, 4(x0)    -> DRAM[1] = 20
-        // nop x5
-        // nop
-        // nop
-        // nop
-        // nop
-        // lw   x3, 0(x0)    -> x3 = 10
-        // lw   x4, 4(x0)    -> x4 = 20
-        // add  x5, x3, x4   -> x5 = 30
-        // nop x5
-        // nop
-        // nop
-        // nop
-        // sw   x5, 8(x0)    -> DRAM[2] = 30
-        // beq  x0, x0, 0
         // =======================================================
         test_num = 4;
         $display("\n=== TEST %0d: Two consecutive loads + add ===", test_num);
@@ -288,17 +240,6 @@ module tb_rv_pl;
         
         // =======================================================
         // TEST 5: Branch test
-        // addi x1, x0, 5
-        // addi x2, x0, 5
-        // beq  x1, x2, +8   -> should branch (skip next instr)
-        // addi x3, x0, 111  -> SKIPPED
-        // addi x3, x0, 222  -> x3 = 222
-        // nop x4
-        // nop
-        // nop
-        // nop
-        // sw   x3, 0(x0)    -> DRAM[0] = 222
-        // beq  x0, x0, 0
         // =======================================================
         test_num = 5;
         $display("\n=== TEST %0d: Branch taken ===", test_num);
@@ -338,7 +279,7 @@ module tb_rv_pl;
         // Status flag at word 64 (byte 0x100)
         DRAM[64] = 32'h00000000;
         
-        // Load the sort program from hex file
+        // Load the sort program from hex file (simpler version of the full 32-element sort)
         $readmemh("sort_mini.hex", IRAM);
         
         reset_cpu;
@@ -359,7 +300,7 @@ module tb_rv_pl;
         test_num = 7;
         $display("\n=== TEST %0d: Full 32-element bubble sort ===", test_num);
         clear_mem;
-        // Load test data (same as Python notebook)
+        // Load test data
         DRAM[0]  = 32'h0000002D; // 45
         DRAM[1]  = 32'hFFFFFFF4; // -12
         DRAM[2]  = 32'h0000004E; // 78
@@ -393,7 +334,8 @@ module tb_rv_pl;
         DRAM[30] = 32'h00000002; // 2
         DRAM[31] = 32'hFFFFFF9D; // -99
         DRAM[64] = 32'h00000000; // status flag
-        
+
+        // Load the sort program from hex file
         $readmemh("sort_32_bubble.hex", IRAM);
         
         reset_cpu;

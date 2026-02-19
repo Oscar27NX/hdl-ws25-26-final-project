@@ -17,7 +17,7 @@
 
 This project uses a complete **RISC-V32I pipelined processor** implementation manually modified to ensure compatibility with the **PYNQ-Z2** development board. The processor features a classic 5-stage pipeline architecture with hazard detection and forwarding.
 
-### Key Features
+### Key Features:
 
 - **Full RISC-V32I ISA Support** - Complete base integer instruction set
 - **5-Stage Pipeline** - Fetch, Decode, Execute, Memory, Write-back
@@ -31,35 +31,41 @@ This project uses a complete **RISC-V32I pipelined processor** implementation ma
 
 ```
 hdl-ws25-26-final-project/
-│
-├── src/
-│   ├── riscv_ip/              # RTL Source Files
-│   │   ├── MyPipelinedProcessor.v
-│   │   ├── MyProgramCounter.v
-│   │   ├── MyRegisterFile.v
-│   │   ├── MyAlu.v
-│   │   ├── MyController.v
-│   │   ├── MyHazardUnit.v
-│   │   ├── fd_register.v
-│   │   ├── de_register.v
-│   │   ├── em_register.v
-│   │   ├── mw_register.v
-│   │   └── ... (supporting modules)
-│   │
-│   ├── block_design/          # FPGA Implementation
-│   │   ├── riscv_pynq_lfg.bit      # Bitstream file
-│   │   ├── riscv_pynq_lfg.hwh      # Hardware handoff file
-│   │   └── pynqriscv_diag_submission.png  # Block diagram
-│   │
-│   ├── riscv_debugging_tbs/   # Testbenches
-│   │   ├── tb_rv_pl.v
-│   │   ├── sort_32_bubble.hex
-│   │   └── sort_mini.hex
-│   │
-│   └── test_script/           # Python Verification
-│       └── pynqz2-riscv-pipeline-VERIFY-submission.ipynb
-│
-└── README.md
+├─ README.md
+└─ src/
+   ├─ bit_and_hwh/
+   │  ├─ riscv_pynq_lfg.bit
+   │  └─ riscv_pynq_lfg.hwh
+   ├─ RTL/
+   │  ├─ block_design/
+   │  │  ├─ pynqriscv_diag_submission.png
+   │  │  └─ riscv_pynq_wrapper.v
+   │  ├─ riscv_core_ip_source/
+   │  │  ├─ MyPipelinedProcessor.v
+   │  │  ├─ MyProgramCounter.v
+   │  │  ├─ MyRegisterFile.v
+   │  │  ├─ MyAlu.v
+   │  │  ├─ MyALUDecoder.v
+   │  │  ├─ MyController.v
+   │  │  ├─ MyControlUnit.v
+   │  │  ├─ MyHazardUnit.v
+   │  │  ├─ MyInstructionDecoder.v
+   │  │  ├─ MyMultiplexer.v
+   │  │  ├─ MyAdder.v
+   │  │  ├─ 3mux.v
+   │  │  ├─ fd_register.v
+   │  │  ├─ de_register.v
+   │  │  ├─ em_register.v
+   │  │  └─ mw_register.v
+   │  └─ simulation/
+   │     ├─ tb_rv_pl.v
+   │     ├─ sort_32_bubble.hex
+   │     └─ sort_mini.hex
+   ├─ software/
+   │  ├─ test_sort_docu.s
+   │  └─ test_sort.hex
+   └─ verification_script/
+      └─ verify_submission.ipynb
 ```
 
 ---
@@ -68,7 +74,7 @@ hdl-ws25-26-final-project/
 
 <div align="center">
 
-![Block Diagram](src/block_design/pynqriscv_diag_submission.png)
+![Block Diagram](src/RTL/block_design/pynqriscv_diag_submission.png)
 
 *PYNQ-Z2 Block Design - RISC-V Processor Integration*
 
@@ -113,6 +119,9 @@ scp src/test_script/*.ipynb xilinx@<PYNQ_IP>:~/
 
 > Recall the default PYNQ credentials!: `username: xilinx`, `password: xilinx`
 
+You can also load the risc_pynq_wrapper.v file into Vivado for reference and modify
+modules there, but it is not needed for deployment.
+
 #### Step 2: Load and Test
 
 1. Connect to your PYNQ board via web browser: `http://<PYNQ_IP>:9090`
@@ -147,7 +156,8 @@ set_property board_part tul.com.tw:pynq-z2:part0:1.0 [current_project]
 
 > Replicate the block diagram exactly as shown in `pynqriscv_diag_submission.png`
 
-1. **Create Block Design**: Tools → Create Block Design
+1. **Create Block Design**: 
+   - Tools → Create Block Design
 2. **Add ZYNQ7 Processing System**:
    - Run Block Automation
    - Configure DDR and fixed IO
@@ -269,12 +279,6 @@ This is an academic project showcasing RISC-V processor design and FPGA implemen
 - Report issues or bugs
 - Suggest improvements
 - Fork and experiment with your own modifications
-
----
-
-## License
-
-This project is developed for educational purposes as part of the Hardware Description Languages course (WS 2025-26).
 
 ---
 
