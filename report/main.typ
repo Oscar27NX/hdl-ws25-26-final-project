@@ -20,7 +20,7 @@
 
 #pagebreak()
 
-= Executive Summary
+= Introduction
 
 This report documents the final version of our pipelined RISC-V core on the PYNQ-Z2 board. The practical shift compared to earlier labs is that verification is no longer done only in a Verilog testbench: the PS side (ARM + Python) drives and checks the PL implementation directly.
 
@@ -68,7 +68,7 @@ We started from the Lab 12 style PS-PL architecture and kept the proven communic
 
 This incremental approach kept integration stable late in the project and made failures easier to localize.
 
-= Module Description and Implementation
+= Module Description
 
 == Pipeline Structure
 
@@ -236,7 +236,7 @@ Beyond RTL issues, several integration mistakes repeatedly blocked progress duri
 
 These were PS/PL integration issues, not algorithmic mistakes in bubble sort. They explain why "simulation passes" did not immediately mean "board passes."
 
-= FPGA Implementation Analysis
+= FPGA Implementation Analysis & Technical Details
 
 This section summarizes the post-implementation Vivado data and the main bottlenecks we observed.
 
@@ -313,17 +313,17 @@ A negative setup slack means the design misses the target period and requires a 
 
 These values explain why timing closure at 100 MHz was not achieved in the cited run, even though functional verification passed.
 
-= Technical Discussion
+== Technical Discussion
 
-== Tradeoff: Split Memories vs Unified Memory
+=== Tradeoff: Split Memories vs Unified Memory
 
 We chose split memories because they gave us a clearer debug path and fewer structural hazards to handle under deadline pressure. A unified BRAM layout can reduce block count, but it moves more complexity into fetch/load-store arbitration.
 
-== Reset Strategy on Board
+=== Reset Strategy on Board
 
 Reset handling on board is critical for repeatability. We used AXI GPIO because it is scriptable and deterministic in automated tests. A physical button is fine for demos, but needs debounce logic to avoid jitter-related false triggers.
 
-== What We Would Improve Next
+=== What We Would Improve Next
 
 If we continue after the final submission, the next steps would be:
 
@@ -355,7 +355,7 @@ The workload was split fairly based on available time and task type.
 
 Shared contribution: all members participated in debugging decisions and final integration discussions.
 
-= Repository and Submission Artifacts
+= GitHub Repository
 
 Project repository used for submission:
 
@@ -369,7 +369,7 @@ Main artifact groups available in the repository:
 - bitstream and hardware handoff (`.bit`, `.hwh`),
 - verification notebook and software-side test material.
 
-= Citations and Disclosure
+= Citations and Appendix
 
 == Citations
 
