@@ -60,13 +60,13 @@ During runtime, the Python notebook accesses three memory-mapped regions:
 
 == Memory Layout Decision
 
-The assignment allows both unified and split memory approaches. We chose the split design (instruction BRAM + data BRAM). This was a practical decision: it reduces structural contention complexity and shortens debug cycles near deadline. A unified memory can be valuable as an optimization exercise, but it requires stricter arbitration and deeper stall policy validation.
+The assignment allows both unified and split memory layouts. We chose split instruction/data BRAM because it reduced contention problems and cut debugging time. A unified memory is still a valid option, but it needs stricter arbitration and more careful stall validation.
 
 == Integration Deltas from the Lab Baseline
 
 We started from the Lab 12 style PS-PL architecture and kept the proven communication structure, then introduced only the changes needed for the final project. AXI SmartConnect was replaced by AXI Interconnect in the final automated flow, a second BRAM controller was added to split IRAM and DRAM, and the `rv_pl` wrapper was packaged as a reusable IP block.
 
-This incremental strategy helped avoid unnecessary integration churn late in the project and made failures easier to localize.
+This incremental approach kept integration stable late in the project and made failures easier to localize.
 
 = Module Description and Implementation
 
@@ -99,12 +99,7 @@ These modifications were necessary for stable board behavior; functional simulat
 
 == Decode and ALU Control Path
 
-Control logic is split into two levels:
-
-- `MyControlUnit.v` decides high-level instruction class behavior (`reg_write`, `mem_write`, `alu_src`, `result_src`, `branch`, `jump`, `alu_op`).
-- `MyALUDecoder.v` maps opcode/function bits to concrete ALU operations.
-
-This split was useful in debugging because opcode-level issues and ALU-operation issues could be diagnosed independently.
+Control logic is split into two levels. `MyControlUnit.v` decides high-level instruction class behavior (`reg_write`, `mem_write`, `alu_src`, `result_src`, `branch`, `jump`, `alu_op`), while `MyALUDecoder.v` maps opcode/function bits to concrete ALU operations. In practice, this made debugging easier because decode-intent errors and ALU-mapping errors could be separated quickly.
 
 == Hazard and BRAM Timing Handling
 
@@ -114,10 +109,7 @@ The main board-specific challenge was synchronous BRAM timing. Because read data
 
 The sorting workload processes 32 signed integers in place in DRAM (`0x00` to `0x7C`). Completion is signaled by storing `0xDEADBEAF` at byte address `0x100`.
 
-During development, we used two program styles:
-
-- an unrolled adjacent compare-swap generator (used in the notebook source for board verification), and
-- a compact loop-based bubble sort program (`sort_32_bubble.hex`) used in simulation/debug runs.
+During development we used two program styles: an unrolled adjacent compare-swap generator (from the notebook side for board verification), and a compact loop-based bubble sort program (`sort_32_bubble.hex`) for simulation/debug runs.
 
 The unrolled network contains `2,980` instructions, which fits in the `4,096`-word IRAM space.
 
@@ -132,13 +124,9 @@ sw   x8, off(x0)
 sw   x7, off+4(x0)
 ```
 
-The constant build sequence is:
+The DONE constant is built with `lui x12, 0xDEADC`, then `addi x12, x12, -337`, and finally written with `sw x12, 256(x0)`.
 
-- `lui x12, 0xDEADC`
-- `addi x12, x12, -337`
-- `sw x12, 256(x0)`
-
-This detail is important because it is both an ISA-constrained implementation choice and the synchronization contract with the host script.
+This constant build pattern comes from ISA limits and is also the handshake point used by the host script.
 
 = Testing and Debugging
 
@@ -156,18 +144,15 @@ The test sequence is intentionally progressive:
 6. mini bubble sort (4 elements),
 7. full 32-element sort with done-flag check.
 
-This structure made it possible to isolate control and memory-timing issues before running the full workload.
+This structure let us isolate control and memory-timing issues before running the full workload.
 
-In team simulation notes, the full 32-element test completes in roughly 9,609 cycles, which matches the expected cost of bubble sort under a simple in-order pipeline with frequent memory traffic.
+In team simulation notes, the full 32-element test completes in roughly 9,609 cycles, which is in line with an in-order bubble-sort workload with frequent memory traffic.
 
 Tests 1-5 isolate individual pipeline behaviors. Test 6 keeps waveforms readable while validating end-to-end sorting behavior on a smaller array. Test 7 runs the full 32-element workload.
 
 == Cross-Simulator Discrepancy Notes
 
-One important development lesson was simulator behavior mismatch. During team debugging, `iverilog` and Vivado `xsim` did not always show identical behavior, with unknown (`x`) propagation appearing in `xsim` runs. The underlying issue was traced to initialization assumptions:
-
-- register file and selected control/data registers required explicit reset/initialization discipline, and
-- BRAM-address staging registers in testbench needed deterministic startup values.
+One development lesson was simulator mismatch. During debugging, `iverilog` and Vivado `xsim` did not always behave the same way, and unknown (`x`) propagation appeared in `xsim` runs. The main cause was initialization assumptions: the register file and selected control/data registers needed explicit reset/initialization discipline, and BRAM-address staging registers in the testbench needed deterministic startup values.
 
 Treating initialization explicitly improves portability and reduces “works here, fails there” ambiguity across simulators.
 
@@ -194,7 +179,7 @@ The Jupyter notebook (`verify_submission.ipynb`) follows a deterministic run seq
 
 The notebook acts as the board-level harness: completion is detected by status polling, and output ordering is checked against a software golden result.
 
-Before running the sorter, the notebook executes interface sanity checks for IRAM, DRAM, and GPIO. Typical checks include write/readback of patterns such as `0xDEADBEEF`, `0xCAFEBABE`, and address-tagged values (`0xAA000000 | offset`) across offsets like `0x0`, `0x4`, `0x10`, `0x7C`, and `0x100`. This step is important because it separates integration faults (addressing, MMIO mapping, reset control) from actual CPU-logic bugs.
+Before running the sorter, the notebook performs sanity checks on IRAM, DRAM, and GPIO. We used write/readback patterns such as `0xDEADBEEF`, `0xCAFEBABE`, and address-tagged values (`0xAA000000 | offset`) at offsets `0x0`, `0x4`, `0x10`, `0x7C`, and `0x100`. This separates integration faults (addressing, MMIO mapping, reset control) from CPU-logic bugs.
 
 == On-Board Execution Profile (Captured Run)
 
@@ -209,7 +194,7 @@ Before running the sorter, the notebook executes interface sanity checks for IRA
   [Result check], [Output compared to Python `sorted()` golden reference],
 )
 
-This profile links memory map, control flow, and verification outcome in one place.
+This profile ties memory map, control flow, and verification outcome into one snapshot.
 
 == Debugging Experience: What Failed and Why
 
@@ -243,28 +228,17 @@ end
 wire [31:0] fd_instr_in = instr_buf_valid ? instr_buf : i_instr;
 ```
 
-This fix is a good example of why board timing behavior must be treated as a first-class design constraint, not a post-processing detail.
+This fix is a good example of why board timing behavior must be treated as a design constraint, not an afterthought.
 
 == Bring-Up Lessons
 
-Beyond RTL issues, several integration mistakes repeatedly blocked progress during board bring-up:
-
-- metadata interpretation mistake:
-  BRAM controllers were initially treated as regular IP entries, while PYNQ exposes them via `mem_dict`. This caused false diagnostics that memory blocks were "missing."
-- naming inconsistency across notebook cells:
-  `bram_controller_irom` was used in some places instead of `bram_controller_iram`, which broke address mapping even when hardware was correct.
-- artifact/version mismatch during fast iteration:
-  stale wrappers/old bitstreams were occasionally tested by mistake, creating contradictory results between simulation and board runs.
-- instruction image size overflow in early attempts:
-  one generated sort program variant exceeded BRAM capacity (`17,304` lines for a `4,096`-word BRAM), so execution could not match expectations on hardware.
-- host-side polling assumptions:
-  early polling/read checks were sometimes performed before valid data became observable, which looked like computation failure even when core-side progress existed.
+Beyond RTL issues, several integration mistakes repeatedly blocked progress during board bring-up. We initially treated BRAM controllers as regular IP entries, while PYNQ exposes them through `mem_dict`, which caused false "missing memory" diagnostics. Notebook naming was also inconsistent (`bram_controller_irom` vs `bram_controller_iram`), so mapping broke even with correct hardware. During rapid iteration, stale wrappers or old bitstreams were occasionally tested by mistake, producing contradictory results between simulation and board runs. One early generated sort image exceeded BRAM capacity (`17,304` lines for a `4,096`-word BRAM), so that version could not execute correctly on hardware. We also saw misleading failures when host polling/read checks were done before valid data became visible.
 
 These were PS/PL integration issues, not algorithmic mistakes in bubble sort. They explain why "simulation passes" did not immediately mean "board passes."
 
 = FPGA Implementation Analysis
 
-This section summarizes the post-implementation data provided from Vivado and explains the observed bottlenecks.
+This section summarizes the post-implementation Vivado data and the main bottlenecks we observed.
 
 == Hierarchical Resource Utilization
 
@@ -288,26 +262,22 @@ This section summarizes the post-implementation data provided from Vivado and ex
 )
 #set text(size: 11pt)
 
-The dominant LUT consumer inside the core is `DE_Register`. This matches expectations: the decode-to-execute boundary carries a wide bundle of operand buses, register indices for hazard decisions, and multiple control signals. The logic cost is therefore concentrated at this stage boundary rather than in a single arithmetic block.
+The dominant LUT consumer inside the core is `DE_Register`. That is expected: the decode-to-execute boundary carries operand buses, register indices for hazard decisions, and multiple control signals. The logic cost is concentrated at this stage boundary rather than in one arithmetic block.
 
 == Critical Path Analysis
 
 From the implementation notes, the reported worst path starts near a memory-stage register index signal and ends at an execute-stage immediate register (`.../M_rf_a3_reg[4]/C -> .../PLR2/E_ext_reg[21]/R`).
 
-This observation suggests that the timing limit is not driven primarily by BRAM setup nor by one ALU operator. Instead, the bottleneck is more consistent with combined control propagation and selection logic around execute-stage forwarding/selection paths.
+This suggests the timing limit is not mainly BRAM setup time and not one ALU operator. The bottleneck is more consistent with combined control propagation and selection logic around execute-stage forwarding paths.
 
 #figure(
   image("assets/worst_path.png", width: 95%),
   caption: [Vivado timing report excerpt for the top violating paths.],
 )
 
-In the captured timing table, multiple top paths share the same characteristics: `Slack = -2.399 ns`, `Levels = 14`, and `High Fanout = 183`, with a common source around `PLR3/M_rf_a3_reg[4]/C` and endpoints in `PLR2` registers (`E_ext`, `E_rf_rd1`, `E_rf_rd2`, `E_rs1`). This pattern supports the interpretation that control/metadata fanout around the decode-execute boundary is a major timing contributor.
+In the captured timing table, multiple top paths share the same pattern: `Slack = -2.399 ns`, `Levels = 14`, and `High Fanout = 183`, with a common source around `PLR3/M_rf_a3_reg[4]/C` and endpoints in `PLR2` registers (`E_ext`, `E_rf_rd1`, `E_rf_rd2`, `E_rs1`). This points to control/metadata fanout around the decode-execute boundary as a major timing contributor.
 
-In practice, this means delay is distributed across control/selection depth:
-
-- forwarding mux selection,
-- branch-target/operand path interaction,
-- execute-stage metadata propagation.
+Practically, delay is spread across forwarding mux selection, branch-target/operand interaction, and execute-stage metadata propagation.
 
 Representative execute-stage structure:
 
@@ -365,7 +335,7 @@ The optional single-cycle bonus track was not part of this submission scope.
 
 = Conclusion
 
-The project objective was met: the pipelined RISC-V core was integrated on PYNQ-Z2 and validated with a repeatable PS-driven hardware-in-the-loop flow. Sorting output is written in place, and completion is detected reliably through the DONE flag protocol.
+We met the project objective: the pipelined RISC-V core was integrated on PYNQ-Z2 and validated with a repeatable PS-driven hardware-in-the-loop flow. Sorting output is written in place, and completion is detected reliably through the DONE flag protocol.
 
 The main technical takeaway is that FPGA correctness depends as much on timing-aware control as on instruction-level logic. The design only stabilized when BRAM timing, hazard policy, and reset handling were treated as one connected problem.
 
@@ -408,7 +378,7 @@ Representative paths:
 - `src/verification_script/verify_submission.ipynb`,
 - `src/bit_and_hwh/riscv_pynq_lfg.bit`, `src/bit_and_hwh/riscv_pynq_lfg.hwh`.
 
-= Citations and Appendix
+= Citations and Disclosure
 
 == Citations
 
@@ -419,4 +389,4 @@ Representative paths:
 
 == AIGC Disclosure
 
-AI assistance was used only for language-level style refinement. Technical content, implementation claims, and verification statements were reviewed against repository artifacts by the team.
+AI assistance was limited to language-level style refinement. Technical content, implementation claims, and verification statements were reviewed against repository artifacts by the team.
