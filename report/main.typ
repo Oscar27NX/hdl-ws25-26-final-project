@@ -369,24 +369,13 @@ Main artifact groups available in the repository:
 - bitstream and hardware handoff (`.bit`, `.hwh`),
 - verification notebook and software-side test material.
 
-Representative paths:
-
-- `src/RTL/riscv_core_ip_source/`,
-- `src/RTL/block_design/riscv_pynq_wrapper.v`,
-- `src/RTL/simulation/tb_rv_pl.v`,
-- `src/software/test_sort_docu.s`, `src/software/test_sort.hex`,
-- `src/verification_script/verify_submission.ipynb`,
-- `src/bit_and_hwh/riscv_pynq_lfg.bit`, `src/bit_and_hwh/riscv_pynq_lfg.hwh`.
-
 = Citations and Disclosure
 
 == Citations
 
 - Final project requirements PDF (course handout, January 27, 2026).
 - PYNQ documentation for overlay/MMIO workflow: `https://pynq.readthedocs.io/`.
-- Repository artifacts used as primary evidence: RTL sources, simulation testbench, verification notebook, block-design wrapper, and hardware handoff file.
-- TUM Typst theme reference: `https://github.com/lufixSch/tum-templates-typst`.
 
 == AIGC Disclosure
 
-AI assistance was limited to language-level style refinement. Technical content, implementation claims, and verification statements were reviewed against repository artifacts by the team.
+AI assistance was limited to language-level style refinement. Technical content, implementation claims, and verification statements were done by us.
